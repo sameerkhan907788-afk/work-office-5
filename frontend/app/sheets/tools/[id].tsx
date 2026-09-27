@@ -26,7 +26,7 @@ export default function SheetsTools() {
   const [meta, setMeta] = useState<FileMeta | null>(null);
   const [content, setContent] = useState<SheetContent | null>(null);
   const [category, setCategory] = useState<typeof CATEGORIES[number]>("AI & Formulas");
-  const [preview, setPreview] = useState<null | { title: string; text: string; apply: () => void }>(null);
+  const [preview, setPreview] = useState<null | { title: string; text: string; apply: () => void | boolean | Promise<void | boolean> }>(null);
   const [promptSheet, setPromptSheet] = useState<null | { title: string; onSubmit: (v: string) => void }>(null);
   const [prompt, setPrompt] = useState("");
 
@@ -39,11 +39,22 @@ export default function SheetsTools() {
 
   const activeSheet = content?.sheets[0];
 
-  const commitContent = useCallback(async (next: SheetContent) => {
-    if (!meta) return;
-    setContent(next);
-    await saveFile({ ...meta, updatedAt: Date.now() }, next);
-  }, [meta]);
+  const commitContent = useCallback(async (next: SheetContent): Promise<boolean> => {
+    if (!meta) return false;
+    try {
+      const ok = await saveFile({ ...meta, updatedAt: Date.now() }, next);
+      if (!ok) {
+        toast.show("Could not apply changes to the spreadsheet", "error");
+        return false;
+      }
+      setContent(next);
+      return true;
+    } catch (error) {
+      console.warn("[sheets-tools] apply failed", error);
+      toast.show("Could not apply changes to the spreadsheet", "error");
+      return false;
+    }
+  }, [meta, toast]);
 
   const asRows = useCallback((): any[][] => {
     if (!activeSheet) return [];
@@ -71,14 +82,14 @@ export default function SheetsTools() {
     return rows;
   }, [activeSheet]);
 
-  const applyRows = useCallback((rows: any[][]) => {
-    if (!content || !activeSheet) return;
+  const applyRows = useCallback(async (rows: any[][]): Promise<boolean> => {
+    if (!content || !activeSheet) return false;
     const cells: any = {};
     rows.forEach((row, r) => row.forEach((v, c) => {
       if (v !== "" && v != null) cells[cellId(r, c)] = { v: typeof v === "number" ? v : String(v) };
     }));
     const next: SheetContent = { ...content, sheets: content.sheets.map((s) => (s.id === activeSheet.id ? { ...s, cells } : s)) };
-    commitContent(next);
+    return commitContent(next);
   }, [content, activeSheet, commitContent]);
 
   const tools: Record<string, { id: string; label: string; icon: string; run: () => void }[]> = {
@@ -331,6 +342,18 @@ export default function SheetsTools() {
     ],
   };
 
+  const applyPreview = useCallback(async () => {
+    if (!preview) return;
+    try {
+      const result = await preview.apply();
+      if (result === false) return;
+      setPreview(null);
+    } catch (error) {
+      console.warn("[sheets-tools] preview apply failed", error);
+      toast.show("Could not apply changes", "error");
+    }
+  }, [preview, toast]);
+
   const active = tools[category] || [];
 
   return (
@@ -378,7 +401,7 @@ export default function SheetsTools() {
         <ScrollView style={{ maxHeight: 320 }}><AppText style={{ fontFamily: "monospace" }}>{preview?.text}</AppText></ScrollView>
         <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
           <Button title="Close" kind="secondary" onPress={() => setPreview(null)} style={{ flex: 1 }} testID="preview-cancel" />
-          <Button title="Apply" onPress={() => { preview?.apply(); setPreview(null); }} style={{ flex: 1 }} testID="preview-apply" />
+          <Button title="Apply" onPress={applyPreview} style={{ flex: 1 }} testID="preview-apply" />
         </View>
       </BottomSheet>
 

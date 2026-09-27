@@ -30,22 +30,39 @@ export default function Templates() {
 
   const applyTemplate = async () => {
     if (!previewTpl) return;
-    if (params.applyTo) {
-      const meta = await getFile(String(params.applyTo));
-      const content = await getContent<SlideContent>(String(params.applyTo));
-      if (meta && content) {
+    try {
+      if (params.applyTo) {
+        const meta = await getFile(String(params.applyTo));
+        const content = await getContent<SlideContent>(String(params.applyTo));
+        if (!meta || !content) {
+          toast.show("Could not open the presentation", "error");
+          return;
+        }
         const newContent = buildFromTemplate(previewTpl, meta.title);
-        await saveFile({ ...meta, updatedAt: Date.now() }, newContent);
+        const ok = await saveFile({ ...meta, updatedAt: Date.now() }, newContent);
+        if (!ok) {
+          toast.show("Could not apply the template", "error");
+          return;
+        }
         toast.show("Template applied", "success");
+        setPreviewTpl(null);
         router.replace(`/slides/${meta.id}` as any);
+        return;
       }
-      return;
+      const { meta, content } = newSlide(previewTpl.name);
+      const nextContent = buildFromTemplate(previewTpl, meta.title);
+      const ok = await saveFile(meta, nextContent);
+      if (!ok) {
+        toast.show("Could not create the presentation", "error");
+        return;
+      }
+      toast.show("Presentation created", "success");
+      setPreviewTpl(null);
+      router.replace(`/slides/${meta.id}` as any);
+    } catch (error) {
+      console.warn("[templates] apply failed", error);
+      toast.show("Could not apply the template", "error");
     }
-    const { meta, content } = newSlide(previewTpl.name);
-    const nextContent = buildFromTemplate(previewTpl, meta.title);
-    await saveFile(meta, nextContent);
-    toast.show("Presentation created", "success");
-    router.replace(`/slides/${meta.id}` as any);
   };
 
   const tw = Math.min((Dimensions.get("window").width - 48) / 2, 220);

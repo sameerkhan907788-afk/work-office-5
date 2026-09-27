@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, StyleSheet, TouchableOpacity, TextInput, ScrollView, Dimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -38,14 +38,30 @@ export default function SheetEditor() {
 
   const activeSheet = useMemo(() => content?.sheets.find((s) => s.id === activeSheetId), [content, activeSheetId]);
 
-  useEffect(() => {
-    (async () => {
-      const m = await getFile(String(id));
-      const c = await getContent<SheetContent>(String(id));
-      setMeta(m); setContent(c);
-      if (c?.sheets[0]) setActiveSheetId(c.sheets[0].id);
-    })();
-  }, [id]);
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+  }, []);
+
+
+  useFocusEffect(useCallback(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const m = await getFile(String(id));
+        const c = await getContent<SheetContent>(String(id));
+        if (mounted) {
+          setMeta(m);
+          setContent(c);
+          if (c?.sheets[0]) setActiveSheetId(c.sheets[0].id);
+        }
+      } catch (error) {
+        console.warn("[sheet] load failed", error);
+        if (mounted) toast.show("Could not open this spreadsheet", "error");
+      }
+    };
+    void load();
+    return () => { mounted = false; };
+  }, [id, toast]));
 
   useEffect(() => {
     if (!activeSheet || !selection) return;
@@ -53,15 +69,25 @@ export default function SheetEditor() {
     setFormula(c?.f ? c.f : (c?.v != null ? String(c.v) : ""));
   }, [selection, activeSheet]);
 
-  const scheduleSave = useCallback((next: SheetContent) => {
-    if (!meta) return;
+  const scheduleSave = useCallback((next: SheetContent, nextMeta?: FileMeta) => {
+    const m = nextMeta || meta;
+    if (!m) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setDirty(true);
     saveTimer.current = setTimeout(async () => {
-      await saveFile({ ...meta, updatedAt: Date.now() }, next);
-      setDirty(false); setSavedAt(Date.now());
+      try {
+        const ok = await saveFile({ ...m, updatedAt: Date.now() }, next);
+        if (!ok) {
+          toast.show("Could not save spreadsheet", "error");
+          return;
+        }
+        setDirty(false); setSavedAt(Date.now());
+      } catch (error) {
+        console.warn("[sheet] save failed", error);
+        toast.show("Could not save spreadsheet", "error");
+      }
     }, 500);
-  }, [meta]);
+  }, [meta, toast]);
 
   const updateSheet = useCallback((sid: string, updater: (s: Sheet) => Sheet) => {
     setContent((prev) => {
@@ -126,7 +152,7 @@ export default function SheetEditor() {
   }, [activeSheet, selection, dragEnd, updateSheet, toast]);
 
   if (!meta || !content || !activeSheet || !selection) {
-    return <View style={[styles.center, { backgroundColor: colors.surface }]}><AppText>Loading…</AppText></View>;
+    return <View style={[styles.center, { backgroundColor: colors.surface }]}><AppText>Spreadsheet unavailable</AppText></View>;
   }
 
   const displayValue = (row: number, col: number) => {
@@ -143,7 +169,7 @@ export default function SheetEditor() {
         <TextInput
           testID="sheet-title"
           value={meta.title}
-          onChangeText={(t) => { const m = { ...meta, title: t }; setMeta(m); if (content) scheduleSave(content); }}
+          onChangeText={(t) => { const m = { ...meta, title: t }; setMeta(m); if (content) scheduleSave(content, m); }}
           returnKeyType="done"
           style={[styles.titleInput, { color: colors.onSurface }]}
         />
@@ -259,7 +285,7 @@ export default function SheetEditor() {
           ))}
           <TouchableOpacity onPress={addSheet} testID="add-sheet"><Icon name="plus" size={20} color={colors.brandPrimary} /></TouchableOpacity>
         </ScrollView>
-        <AppText variant="caption" style={{ paddingHorizontal: 12 }}>{dirty ? "Saving…" : "Saved"}</AppText>
+        <AppText variant="caption" style={{ paddingHorizontal: 12 }}>{dirty ? "Unsaved changes" : "Saved"}</AppText>
       </View>
       </KeyboardAvoid>
 

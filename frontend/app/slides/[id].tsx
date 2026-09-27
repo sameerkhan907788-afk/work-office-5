@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View, StyleSheet, TouchableOpacity, ScrollView, TextInput, Dimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -32,24 +32,48 @@ export default function SlideEditor() {
   const [dirty, setDirty] = useState(false);
   const saveTimer = useRef<any>(null);
 
-  useEffect(() => {
-    (async () => {
-      const m = await getFile(String(id));
-      const c = await getContent<SlideContent>(String(id));
-      setMeta(m); setContent(c);
-    })();
-  }, [id]);
+  useFocusEffect(useCallback(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const m = await getFile(String(id));
+        const c = await getContent<SlideContent>(String(id));
+        if (mounted) {
+          setMeta(m);
+          setContent(c);
+        }
+      } catch (error) {
+        console.warn("[slides] load failed", error);
+        if (mounted) toast.show("Could not open this presentation", "error");
+      }
+    };
+    void load();
+    return () => { mounted = false; };
+  }, [id, toast]));
 
-  const scheduleSave = useCallback((next: SlideContent) => {
-    if (!meta) return;
+  const scheduleSave = useCallback((next: SlideContent, nextMeta?: FileMeta) => {
+    const m = nextMeta || meta;
+    if (!m) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setDirty(true);
     saveTimer.current = setTimeout(async () => {
-      await saveFile({ ...meta, updatedAt: Date.now() }, next);
-      setDirty(false); setSavedAt(Date.now());
+      try {
+        const ok = await saveFile({ ...m, updatedAt: Date.now() }, next);
+        if (!ok) {
+          toast.show("Could not save presentation", "error");
+          return;
+        }
+        setDirty(false); setSavedAt(Date.now());
+      } catch (error) {
+        console.warn("[slides] save failed", error);
+        toast.show("Could not save presentation", "error");
+      }
     }, 500);
-  }, [meta]);
+  }, [meta, toast]);
 
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+  }, []);
   const updateContent = useCallback((updater: (c: SlideContent) => SlideContent) => {
     setContent((prev) => { if (!prev) return prev; const n = updater(prev); scheduleSave(n); return n; });
   }, [scheduleSave]);
@@ -106,7 +130,7 @@ export default function SlideEditor() {
   }, [updateSlide, content]);
 
   if (!meta || !content) {
-    return <View style={[styles.center, { backgroundColor: colors.surface }]}><AppText>Loading…</AppText></View>;
+    return <View style={[styles.center, { backgroundColor: colors.surface }]}><AppText>Presentation unavailable</AppText></View>;
   }
 
   const slide = content.slides[current];
@@ -133,7 +157,7 @@ export default function SlideEditor() {
         <TextInput
           testID="slide-title"
           value={meta.title}
-          onChangeText={(t) => { const m = { ...meta, title: t }; setMeta(m); if (content) scheduleSave(content); }}
+          onChangeText={(t) => { const m = { ...meta, title: t }; setMeta(m); if (content) scheduleSave(content, m); }}
           returnKeyType="done"
           style={[styles.titleInput, { color: colors.onSurface }]}
         />
@@ -190,7 +214,7 @@ export default function SlideEditor() {
       </ScrollView>
 
       <View style={{ padding: 8, alignItems: "center" }}>
-        <AppText variant="caption">{dirty ? "Saving…" : "Saved"} · Slide {current + 1} of {content.slides.length}</AppText>
+        <AppText variant="caption">{dirty ? "Unsaved changes" : "Saved"} · Slide {current + 1} of {content.slides.length}</AppText>
       </View>
       </KeyboardAvoid>
     </View>

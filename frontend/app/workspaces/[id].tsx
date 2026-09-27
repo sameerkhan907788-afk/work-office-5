@@ -56,7 +56,7 @@ export default function WorkspaceDetail() {
     router.push(`/docs/${dm.id}` as any);
   };
 
-  if (!ws) return <View style={[styles.container, { backgroundColor: colors.surface, paddingTop: insets.top }]}><AppText>Loading…</AppText></View>;
+  if (!ws) return <View style={[styles.container, { backgroundColor: colors.surface, paddingTop: insets.top }]}><AppText>Workspace unavailable</AppText></View>;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface, paddingTop: insets.top }]}>

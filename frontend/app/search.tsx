@@ -17,7 +17,6 @@ export default function Search() {
   const { colors } = useTheme();
   const [q, setQ] = useState("");
   const [index, setIndex] = useState<{ file: FileMeta; text: string }[]>([]);
-  const [ready, setReady] = useState(false);
 
   // The search field auto-focuses; never let the keyboard linger after leaving.
   useDismissKeyboardOnUnmount();
@@ -35,7 +34,7 @@ export default function Search() {
         else if (f.type === "slide" && c?.slides) text = c.slides.flatMap((s: any) => s.elements.filter((e: any) => e.kind === "text").map((e: any) => e.text)).join(" ");
         idx.push({ file: f, text });
       }
-      setIndex(idx); setReady(true);
+      setIndex(idx);
     })();
   }, []);
 
@@ -66,7 +65,7 @@ export default function Search() {
       </View>
       <KeyboardAvoid style={{ flex: 1 }}>
       <ScrollView {...SCROLL_KEYBOARD_PROPS} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24, gap: 10 }}>
-        {!ready ? <AppText variant="muted">Indexing…</AppText> : q.trim() === "" ? <AppText variant="muted">Type to search across documents, sheets and slides.</AppText> : hits.length === 0 ? <Card><AppText style={{ textAlign: "center" }}>No matches</AppText></Card> : hits.map((h) => {
+        {q.trim() === "" ? <AppText variant="muted">Type to search across documents, sheets and slides.</AppText> : hits.length === 0 ? <Card><AppText style={{ textAlign: "center" }}>No matches</AppText></Card> : hits.map((h) => {
           const iconName = h.file.type === "doc" ? "file-document-outline" : h.file.type === "sheet" ? "table" : "presentation";
           const iconColor = h.file.type === "doc" ? "#FF5E00" : h.file.type === "sheet" ? "#22C55E" : "#7C3AED";
           return (

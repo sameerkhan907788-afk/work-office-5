@@ -28,7 +28,7 @@ export default function DocsTools() {
   const [content, setContent] = useState<DocContent | null>(null);
   const [previewTitle, setPreviewTitle] = useState<string | null>(null);
   const [previewText, setPreviewText] = useState("");
-  const [previewApply, setPreviewApply] = useState<null | (() => void)>(null);
+  const [previewApply, setPreviewApply] = useState<null | (() => void | boolean | Promise<void | boolean>)>(null);
   const [category, setCategory] = useState<typeof CATEGORIES[number]>("AI & Writing");
 
   const [aiPromptOpen, setAiPromptOpen] = useState<null | { title: string; onSubmit: (p: string) => void }>(null);
@@ -43,25 +43,60 @@ export default function DocsTools() {
 
   const allText = useCallback(() => (content?.blocks || []).map((b) => b.text).join("\n"), [content]);
 
-  const applyBlocks = useCallback(async (text: string, prepend?: string) => {
-    if (!meta || !content) return;
+  const applyBlocks = useCallback(async (text: string, prepend?: string): Promise<boolean> => {
+    if (!meta || !content) return false;
     const blocks = text.split(/\n\n+/).map((p) => ({ id: genId(), kind: "p" as const, text: p.trim() })).filter((b) => b.text);
     const nextContent: DocContent = prepend ? { blocks: [{ id: genId(), kind: "h2", text: prepend }, ...blocks, ...content.blocks] } : { blocks };
-    setContent(nextContent);
-    await saveFile({ ...meta, updatedAt: Date.now() }, nextContent);
-  }, [meta, content]);
+    try {
+      const ok = await saveFile({ ...meta, updatedAt: Date.now() }, nextContent);
+      if (!ok) {
+        toast.show("Could not apply changes to the document", "error");
+        return false;
+      }
+      setContent(nextContent);
+      return true;
+    } catch (error) {
+      console.warn("[docs-tools] apply failed", error);
+      toast.show("Could not apply changes to the document", "error");
+      return false;
+    }
+  }, [meta, content, toast]);
 
-  const replaceAll = useCallback(async (text: string) => {
-    if (!meta) return;
+  const replaceAll = useCallback(async (text: string): Promise<boolean> => {
+    if (!meta) return false;
     const blocks = text.split(/\n\n+/).map((p) => ({ id: genId(), kind: "p" as const, text: p.trim() })).filter((b) => b.text);
     const nextContent: DocContent = { blocks: blocks.length ? blocks : [{ id: genId(), kind: "p", text: "" }] };
-    setContent(nextContent);
-    await saveFile({ ...meta, updatedAt: Date.now() }, nextContent);
-  }, [meta]);
+    try {
+      const ok = await saveFile({ ...meta, updatedAt: Date.now() }, nextContent);
+      if (!ok) {
+        toast.show("Could not apply changes to the document", "error");
+        return false;
+      }
+      setContent(nextContent);
+      return true;
+    } catch (error) {
+      console.warn("[docs-tools] replace failed", error);
+      toast.show("Could not apply changes to the document", "error");
+      return false;
+    }
+  }, [meta, toast]);
 
-  const preview = (title: string, text: string, apply: () => void) => {
+  const preview = (title: string, text: string, apply: () => void | boolean | Promise<void | boolean>) => {
     setPreviewTitle(title); setPreviewText(text); setPreviewApply(() => apply);
   };
+
+  const applyPreview = useCallback(async () => {
+    if (!previewApply) return;
+    try {
+      const result = await previewApply();
+      if (result === false) return;
+      setPreviewTitle(null);
+      setPreviewApply(null);
+    } catch (error) {
+      console.warn("[docs-tools] preview apply failed", error);
+      toast.show("Could not apply changes", "error");
+    }
+  }, [previewApply, toast]);
 
   const tools: Record<string, ToolAction[]> = {
     "AI & Writing": [
@@ -270,7 +305,7 @@ export default function DocsTools() {
         <ScrollView style={{ maxHeight: 320 }}><AppText>{previewText}</AppText></ScrollView>
         <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
           <Button title="Cancel" kind="secondary" onPress={() => { setPreviewTitle(null); setPreviewApply(null); }} style={{ flex: 1 }} testID="preview-cancel" />
-          <Button title="Apply" icon="check" onPress={() => { previewApply?.(); setPreviewTitle(null); setPreviewApply(null); }} style={{ flex: 1 }} testID="preview-apply" />
+          <Button title="Apply" icon="check" onPress={applyPreview} style={{ flex: 1 }} testID="preview-apply" />
         </View>
       </BottomSheet>
 

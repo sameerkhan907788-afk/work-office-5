@@ -1,5 +1,5 @@
 import React from "react";
-import { TouchableOpacity, StyleSheet, ActivityIndicator, View, ViewStyle } from "react-native";
+import { TouchableOpacity, StyleSheet, View, ViewStyle } from "react-native";
 import { AppText } from "./app-text";
 import { useTheme, radius, spacing } from "@/src/theme";
 import Icon from "@react-native-vector-icons/material-design-icons";
@@ -27,12 +27,10 @@ export function Button({ title, onPress, kind = "primary", icon, loading, disabl
       testID={testID}
       style={[styles.btn, { backgroundColor: bg, borderColor: border, borderWidth: border ? 1 : 0, paddingHorizontal: pad.px, paddingVertical: pad.py, opacity: disabled ? 0.5 : 1 }, style]}
     >
-      {loading ? <ActivityIndicator color={fg} size="small" /> : (
-        <View style={styles.row}>
-          {icon ? <Icon name={icon as any} size={pad.fs + 3} color={fg} /> : null}
-          <AppText style={{ color: fg, fontSize: pad.fs, fontWeight: "600" }}>{title}</AppText>
-        </View>
-      )}
+      <View style={styles.row}>
+        {icon ? <Icon name={icon as any} size={pad.fs + 3} color={fg} /> : null}
+        <AppText style={{ color: fg, fontSize: pad.fs, fontWeight: "600" }}>{title}</AppText>
+      </View>
     </TouchableOpacity>
   );
 }

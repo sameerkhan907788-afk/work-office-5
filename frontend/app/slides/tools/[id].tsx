@@ -26,7 +26,7 @@ export default function SlidesTools() {
   const [meta, setMeta] = useState<FileMeta | null>(null);
   const [content, setContent] = useState<SlideContent | null>(null);
   const [category, setCategory] = useState<typeof CATEGORIES[number]>("AI Presentation");
-  const [preview, setPreview] = useState<null | { title: string; text: string; apply: () => void }>(null);
+  const [preview, setPreview] = useState<null | { title: string; text: string; apply: () => void | boolean | Promise<void | boolean> }>(null);
   const [promptSheet, setPromptSheet] = useState<null | { title: string; onSubmit: (v: string) => void }>(null);
   const [prompt, setPrompt] = useState("");
 
@@ -37,10 +37,22 @@ export default function SlidesTools() {
     })();
   }, [id]);
 
-  const commit = useCallback(async (next: SlideContent) => {
-    if (!meta) return;
-    setContent(next); await saveFile({ ...meta, updatedAt: Date.now() }, next);
-  }, [meta]);
+  const commit = useCallback(async (next: SlideContent): Promise<boolean> => {
+    if (!meta) return false;
+    try {
+      const ok = await saveFile({ ...meta, updatedAt: Date.now() }, next);
+      if (!ok) {
+        toast.show("Could not apply changes to the presentation", "error");
+        return false;
+      }
+      setContent(next);
+      return true;
+    } catch (error) {
+      console.warn("[slides-tools] apply failed", error);
+      toast.show("Could not apply changes to the presentation", "error");
+      return false;
+    }
+  }, [meta, toast]);
 
   const generateFromTopic = useCallback((topic: string, count = 10) => {
     if (!content) return;
@@ -250,6 +262,18 @@ export default function SlidesTools() {
     ],
   };
 
+  const applyPreview = useCallback(async () => {
+    if (!preview) return;
+    try {
+      const result = await preview.apply();
+      if (result === false) return;
+      setPreview(null);
+    } catch (error) {
+      console.warn("[slides-tools] preview apply failed", error);
+      toast.show("Could not apply changes", "error");
+    }
+  }, [preview, toast]);
+
   const active = tools[category] || [];
 
   return (
@@ -295,7 +319,7 @@ export default function SlidesTools() {
         <ScrollView style={{ maxHeight: 320 }}><AppText>{preview?.text}</AppText></ScrollView>
         <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
           <Button title="Close" kind="secondary" onPress={() => setPreview(null)} style={{ flex: 1 }} testID="preview-cancel" />
-          <Button title="Apply" onPress={() => { preview?.apply(); setPreview(null); }} style={{ flex: 1 }} testID="preview-apply" />
+          <Button title="Apply" onPress={applyPreview} style={{ flex: 1 }} testID="preview-apply" />
         </View>
       </BottomSheet>
 

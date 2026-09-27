@@ -91,21 +91,35 @@ export async function getContent<T = any>(id: string): Promise<T | null> {
   return readJSON<T | null>(K.content(id), null);
 }
 
-export async function saveFile(meta: FileMeta, content: any) {
-  const ids = await readJSON<string[]>(K.fileIndex, []);
-  if (!ids.includes(meta.id)) {
-    ids.push(meta.id);
-    await writeJSON(K.fileIndex, ids);
-  }
-  meta.updatedAt = Date.now();
-  // append version
+export async function saveFile(meta: FileMeta, content: any): Promise<boolean> {
   try {
-    const hist = await readJSON<any[]>(K.history(meta.id), []);
-    hist.unshift({ ts: Date.now(), content });
-    await writeJSON(K.history(meta.id), hist.slice(0, 20));
-  } catch {}
-  await writeJSON(K.meta(meta.id), meta);
-  await writeJSON(K.content(meta.id), content);
+    const ids = await readJSON<string[]>(K.fileIndex, []);
+    if (!ids.includes(meta.id)) {
+      ids.push(meta.id);
+      if (!(await writeJSON(K.fileIndex, ids))) return false;
+    }
+
+    const nextMeta = { ...meta, updatedAt: Date.now() };
+    // Version history is best-effort; the current document remains the source of truth.
+    try {
+      const hist = await readJSON<any[]>(K.history(meta.id), []);
+      hist.unshift({ ts: Date.now(), content });
+      await writeJSON(K.history(meta.id), hist.slice(0, 20));
+    } catch (error) {
+      console.warn(`[storage] history write failed for ${meta.id}`, error);
+    }
+
+    const metaSaved = await writeJSON(K.meta(meta.id), nextMeta);
+    const contentSaved = await writeJSON(K.content(meta.id), content);
+    if (!metaSaved || !contentSaved) {
+      console.warn(`[storage] file save incomplete for ${meta.id}`);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.warn(`[storage] file save failed for ${meta.id}`, error);
+    return false;
+  }
 }
 
 export async function updateMeta(id: string, patch: Partial<FileMeta>) {

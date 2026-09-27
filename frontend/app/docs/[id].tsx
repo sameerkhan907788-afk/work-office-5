@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, StyleSheet, TouchableOpacity, TextInput, ScrollView, FlatList, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -32,13 +32,24 @@ export default function DocEditor() {
   const futureRef = useRef<DocContent[]>([]);
   const saveTimer = useRef<any>(null);
 
-  useEffect(() => {
-    (async () => {
-      const m = await getFile(String(id));
-      const c = await getContent<DocContent>(String(id));
-      setMeta(m); setContent(c || { blocks: [{ id: genId(), kind: "p", text: "" }] });
-    })();
-  }, [id]);
+  useFocusEffect(useCallback(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const m = await getFile(String(id));
+        const c = await getContent<DocContent>(String(id));
+        if (mounted) {
+          setMeta(m);
+          setContent(c || { blocks: [{ id: genId(), kind: "p", text: "" }] });
+        }
+      } catch (error) {
+        console.warn("[doc] load failed", error);
+        if (mounted) toast.show("Could not open this document", "error");
+      }
+    };
+    void load();
+    return () => { mounted = false; };
+  }, [id, toast]));
 
   const scheduleSave = useCallback((nextContent: DocContent, nextMeta?: FileMeta) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -46,11 +57,23 @@ export default function DocEditor() {
     saveTimer.current = setTimeout(async () => {
       const m = nextMeta || meta;
       if (!m) return;
-      await saveFile({ ...m, updatedAt: Date.now() }, nextContent);
-      setDirty(false); setSavedAt(Date.now());
+      try {
+        const ok = await saveFile({ ...m, updatedAt: Date.now() }, nextContent);
+        if (!ok) {
+          toast.show("Could not save document", "error");
+          return;
+        }
+        setDirty(false); setSavedAt(Date.now());
+      } catch (error) {
+        console.warn("[doc] save failed", error);
+        toast.show("Could not save document", "error");
+      }
     }, 500);
-  }, [meta]);
+  }, [meta, toast]);
 
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+  }, []);
   const commit = useCallback((updater: (c: DocContent) => DocContent) => {
     setContent((prev) => {
       if (!prev) return prev;
@@ -129,10 +152,10 @@ export default function DocEditor() {
   }, [find, replace, commit, toast]);
 
   if (!meta || !content) {
-    return <View style={[styles.center, { backgroundColor: colors.surface }]}><AppText>Loading…</AppText></View>;
+    return <View style={[styles.center, { backgroundColor: colors.surface }]}><AppText>Document unavailable</AppText></View>;
   }
 
-  const status = dirty ? "Saving…" : savedAt ? "Saved" : "Ready";
+  const status = dirty ? "Unsaved changes" : savedAt ? "Saved" : "Ready";
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface, paddingTop: insets.top }]}>
