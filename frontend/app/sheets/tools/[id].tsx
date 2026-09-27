@@ -7,6 +7,7 @@ import { AppText } from "@/src/components/app-text";
 import { Card } from "@/src/components/card";
 import { BottomSheet } from "@/src/components/bottom-sheet";
 import { Button } from "@/src/components/button";
+import { SCROLL_KEYBOARD_PROPS, dismissKeyboard } from "@/src/components/keyboard";
 import { useToast } from "@/src/components/toast";
 import { useTheme, radius } from "@/src/theme";
 import { FileMeta, SheetContent, getContent, getFile, genId, saveFile, newDoc, newSlide } from "@/src/storage/db";
@@ -349,7 +350,7 @@ export default function SheetsTools() {
         }})} testID="ai-command"><Icon name="star-four-points" size={22} color={colors.brandPrimary} /></TouchableOpacity>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 56 }} contentContainerStyle={{ paddingHorizontal: 12, gap: 8, alignItems: "center" }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: 56 }} contentContainerStyle={{ paddingHorizontal: 12, gap: 8, alignItems: "center" }}>
         {CATEGORIES.map((c) => (
           <TouchableOpacity key={c} testID={`cat-${c}`} onPress={() => setCategory(c)} style={[styles.chip, { backgroundColor: category === c ? colors.brandPrimary : colors.surfaceSecondary, borderColor: colors.border, flexShrink: 0 }]}>
             <AppText style={{ color: category === c ? colors.onBrandPrimary : colors.onSurface, fontSize: 13, fontWeight: "600" }}>{c}</AppText>
@@ -357,7 +358,7 @@ export default function SheetsTools() {
         ))}
       </ScrollView>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24, gap: 10 }}>
+      <ScrollView {...SCROLL_KEYBOARD_PROPS} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24, gap: 10 }}>
         {active.map((t) => (
           <TouchableOpacity key={t.id} testID={`tool-${t.id}`} onPress={t.run} activeOpacity={0.85}>
             <Card style={{ padding: 14 }}>
@@ -388,7 +389,7 @@ export default function SheetsTools() {
           placeholder="Type here" placeholderTextColor={colors.muted}
           style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, minHeight: 80, color: colors.onSurface, textAlignVertical: "top" }}
         />
-        <Button title="Run" icon="play" onPress={() => { const cb = promptSheet?.onSubmit; setPromptSheet(null); setPrompt(""); cb?.(prompt); }} style={{ marginTop: 12 }} testID="ai-prompt-run" />
+        <Button title="Run" icon="play" onPress={() => { const cb = promptSheet?.onSubmit; dismissKeyboard(); setPromptSheet(null); setPrompt(""); cb?.(prompt); }} style={{ marginTop: 12 }} testID="ai-prompt-run" />
       </BottomSheet>
     </View>
   );

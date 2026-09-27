@@ -119,6 +119,17 @@ backend:
         agent: "main"
         comment: "User explicitly selected fully offline notification UI with no backend or push service."
 frontend:
+  - task: "Keyboard behavior hardening across all screens (focus, taps, scroll, layout, error-proofing)"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/components/keyboard.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added shared guarded keyboard utilities (KeyboardAvoid/KeyboardModalAvoid with error-boundary fallback, safe dismissKeyboard, unmount-dismiss hook, SCROLL_KEYBOARD_PROPS). BottomSheet is now keyboard-aware (inputs in modals never hidden, keyboard dismissed on close/run). All screens got keyboardShouldPersistTaps=handled so taps register while keyboard is open, keyboardDismissMode on-drag/interactive, returnKeyType/submit behavior, and dismiss-before-navigation. expo-notifications is NOT installed (verified package.json + sources), so notifications were left unchanged. tsc + eslint clean; smoke-tested Home search+filters, Doc editor typing/toolbar, Find&Replace sheet, Workspace create sheet on web preview."
   - task: "Jarvis Office branding, Home launch, offline notifications, legal Settings links, and UI hardening"
     implemented: true
     working: "NA"
@@ -162,4 +173,6 @@ agent_communication:
     message: "Renamed Home create cards and filter tags: Docs -> Document, Sheets -> Spreadsheet, Slides -> Presentation. Retest Home labels and ensure underlying create/filter navigation still routes to docs/sheets/slides."
   - agent: "testing"
     message: "✅ HOME UI RENAME VERIFICATION COMPLETE - ALL TESTS PASSED. Comprehensive testing confirmed: (1) Create cards display exactly 'Document', 'Spreadsheet', 'Presentation' (not Docs/Sheets/Slides); (2) Filter tags display 'All', 'Document', 'Spreadsheet', 'Presentation', 'Favorite', 'Trash' with proper capitalization; (3) No old labels (Docs/Sheets/Slides) remain in Home UI; (4) Create cards route correctly to /docs/, /sheets/, /slides/ paths; (5) All filter tags are clickable and filter correctly; (6) Zero runtime errors, only 3 expected React Native web compatibility warnings. UI rename successful, all functionality preserved."
+  - agent: "main"
+    message: "Keyboard hardening pass complete. Please regression-test: (1) Home search input typing + tapping filter chips/file rows while input is focused must act immediately (no first-tap swallowed); (2) Doc editor: title input, block typing, toolbar buttons usable while keyboard/focus active, Find & Replace sheet inputs focusable and Replace-all works; (3) Sheets: title + formula input commit (submit/blur), cell taps while formula focused; (4) Slides: title input, element text edit input; (5) Rename screen autoFocus + submit via keyboard done; (6) Workspaces create sheet input + create; (7) Templates search + category chips while focused; (8) All tools screens open AI prompt bottom sheets with inputs, Run works; (9) No crashes, blank screens, or new console errors anywhere; (10) All pre-existing flows unchanged (create/edit/autosave/navigation/settings/legal/notifications). Note: expo-notifications is not installed; notifications feature is unchanged local AsyncStorage inbox."
 

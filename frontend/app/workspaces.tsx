@@ -7,6 +7,7 @@ import { AppText } from "@/src/components/app-text";
 import { Card } from "@/src/components/card";
 import { BottomSheet } from "@/src/components/bottom-sheet";
 import { Button } from "@/src/components/button";
+import { SCROLL_KEYBOARD_PROPS } from "@/src/components/keyboard";
 import { useToast } from "@/src/components/toast";
 import { useTheme, radius } from "@/src/theme";
 import { FileMeta, Workspace, deleteWorkspace, genId, listFiles, listWorkspaces, saveWorkspace } from "@/src/storage/db";
@@ -46,7 +47,7 @@ export default function Workspaces() {
         <TouchableOpacity onPress={() => setNewOpen(true)} testID="ws-new"><Icon name="plus" size={24} color={colors.brandPrimary} /></TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 24 }}>
+      <ScrollView {...SCROLL_KEYBOARD_PROPS} contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 24 }}>
         {ws.length === 0 ? (
           <Card><AppText style={{ textAlign: "center" }}>No workspaces yet. Create one to group related files.</AppText></Card>
         ) : ws.map((w) => {
@@ -72,6 +73,7 @@ export default function Workspaces() {
 
       <BottomSheet visible={newOpen} onClose={() => setNewOpen(false)} title="New workspace">
         <TextInput testID="ws-name" value={name} onChangeText={setName} placeholder="Workspace name" placeholderTextColor={colors.muted}
+          returnKeyType="done" onSubmitEditing={() => { void create(); }} blurOnSubmit
           style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, color: colors.onSurface }} />
         <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
           {COLORS.map((c) => (

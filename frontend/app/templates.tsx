@@ -7,6 +7,7 @@ import { AppText } from "@/src/components/app-text";
 import { Card } from "@/src/components/card";
 import { BottomSheet } from "@/src/components/bottom-sheet";
 import { Button } from "@/src/components/button";
+import { KeyboardAvoid, SCROLL_KEYBOARD_PROPS } from "@/src/components/keyboard";
 import { useToast } from "@/src/components/toast";
 import { useTheme, radius } from "@/src/theme";
 import { buildFromTemplate, TEMPLATES, TemplateCategory } from "@/src/slides/templates";
@@ -58,10 +59,11 @@ export default function Templates() {
 
       <View style={[styles.search, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
         <Icon name="magnify" size={18} color={colors.muted} />
-        <TextInput testID="tpl-search" value={q} onChangeText={setQ} placeholder="Search templates" placeholderTextColor={colors.muted} style={{ flex: 1, color: colors.onSurface, fontSize: 14 }} />
+        <TextInput testID="tpl-search" value={q} onChangeText={setQ} placeholder="Search templates" placeholderTextColor={colors.muted} returnKeyType="search" style={{ flex: 1, color: colors.onSurface, fontSize: 14 }} />
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 52 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: "center", paddingVertical: 8 }}>
+      <KeyboardAvoid style={{ flex: 1 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: 52 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: "center", paddingVertical: 8 }}>
         {cats.map((c) => (
           <TouchableOpacity key={c} testID={`tpl-cat-${c}`} onPress={() => setCat(c as any)} style={[styles.chip, { backgroundColor: cat === c ? colors.brandPrimary : colors.surfaceSecondary, borderColor: colors.border, flexShrink: 0 }]}>
             <AppText style={{ color: cat === c ? colors.onBrandPrimary : colors.onSurface, fontSize: 13, fontWeight: "600" }}>{c}</AppText>
@@ -69,7 +71,7 @@ export default function Templates() {
         ))}
       </ScrollView>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}>
+      <ScrollView {...SCROLL_KEYBOARD_PROPS} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
           {filtered.map((t) => {
             const preview = t.build(t.name)[0];
@@ -90,6 +92,7 @@ export default function Templates() {
           })}
         </View>
       </ScrollView>
+      </KeyboardAvoid>
 
       <BottomSheet visible={!!previewTpl} onClose={() => setPreviewTpl(null)} title={previewTpl?.name}>
         {previewTpl ? (

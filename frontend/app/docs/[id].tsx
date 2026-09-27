@@ -1,11 +1,12 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, StyleSheet, TouchableOpacity, TextInput, ScrollView, FlatList, KeyboardAvoidingView, Platform } from "react-native";
+import { View, StyleSheet, TouchableOpacity, TextInput, ScrollView, FlatList, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { AppText } from "@/src/components/app-text";
 import { BottomSheet } from "@/src/components/bottom-sheet";
 import { Button } from "@/src/components/button";
+import { KeyboardAvoid, SCROLL_KEYBOARD_PROPS, dismissKeyboard } from "@/src/components/keyboard";
 import { useToast } from "@/src/components/toast";
 import { useTheme, spacing, radius } from "@/src/theme";
 import { DocBlock, DocContent, FileMeta, getContent, getFile, genId, saveFile } from "@/src/storage/db";
@@ -145,6 +146,7 @@ export default function DocEditor() {
           onChangeText={setTitle}
           placeholder="Untitled"
           placeholderTextColor={colors.muted}
+          returnKeyType="done"
           style={[styles.titleInput, { color: colors.onSurface }]}
         />
         <View style={{ flexDirection: "row", gap: 6 }}>
@@ -161,8 +163,8 @@ export default function DocEditor() {
         <AppText variant="caption">{status} · {content.blocks.reduce((s, b) => s + b.text.trim().split(/\s+/).filter(Boolean).length, 0)} words</AppText>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
+      <KeyboardAvoid style={{ flex: 1 }}>
+        <ScrollView {...SCROLL_KEYBOARD_PROPS} contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
           {content.blocks.map((b) => (
             <BlockEditor
               key={b.id} block={b}
@@ -177,7 +179,7 @@ export default function DocEditor() {
           </TouchableOpacity>
         </ScrollView>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.toolbar, { borderTopColor: colors.border, backgroundColor: colors.surfaceSecondary }]} contentContainerStyle={{ paddingHorizontal: 12, alignItems: "center", gap: 6 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={[styles.toolbar, { borderTopColor: colors.border, backgroundColor: colors.surfaceSecondary }]} contentContainerStyle={{ paddingHorizontal: 12, alignItems: "center", gap: 6 }}>
           <TB icon="format-header-1" onPress={() => setKindOnSelected("h1")} />
           <TB icon="format-header-2" onPress={() => setKindOnSelected("h2")} />
           <TB icon="format-header-3" onPress={() => setKindOnSelected("h3")} />
@@ -198,12 +200,12 @@ export default function DocEditor() {
           <View style={styles.divider} />
           <TB icon="minus" onPress={() => insertBlock(selection?.blockId ?? null, "divider")} />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAvoid>
 
       <BottomSheet visible={findVisible} onClose={() => setFindVisible(false)} title="Find & Replace">
-        <TextInput testID="find-input" value={find} onChangeText={setFind} placeholder="Find" placeholderTextColor={colors.muted} style={[styles.input, { color: colors.onSurface, borderColor: colors.border }]} />
-        <TextInput testID="replace-input" value={replace} onChangeText={setReplace} placeholder="Replace with" placeholderTextColor={colors.muted} style={[styles.input, { color: colors.onSurface, borderColor: colors.border, marginTop: 8 }]} />
-        <Button testID="replace-run" title="Replace all" icon="find-replace" onPress={() => { runFindReplace(); setFindVisible(false); }} style={{ marginTop: 12 }} />
+        <TextInput testID="find-input" value={find} onChangeText={setFind} placeholder="Find" placeholderTextColor={colors.muted} returnKeyType="next" style={[styles.input, { color: colors.onSurface, borderColor: colors.border }]} />
+        <TextInput testID="replace-input" value={replace} onChangeText={setReplace} placeholder="Replace with" placeholderTextColor={colors.muted} returnKeyType="done" onSubmitEditing={() => { dismissKeyboard(); runFindReplace(); setFindVisible(false); }} style={[styles.input, { color: colors.onSurface, borderColor: colors.border, marginTop: 8 }]} />
+        <Button testID="replace-run" title="Replace all" icon="find-replace" onPress={() => { dismissKeyboard(); runFindReplace(); setFindVisible(false); }} style={{ marginTop: 12 }} />
       </BottomSheet>
     </View>
   );

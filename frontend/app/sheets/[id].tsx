@@ -6,6 +6,7 @@ import Icon from "@react-native-vector-icons/material-design-icons";
 import { AppText } from "@/src/components/app-text";
 import { BottomSheet } from "@/src/components/bottom-sheet";
 import { Button } from "@/src/components/button";
+import { KeyboardAvoid, SCROLL_KEYBOARD_PROPS } from "@/src/components/keyboard";
 import { useToast } from "@/src/components/toast";
 import { useTheme, radius } from "@/src/theme";
 import { Cell, FileMeta, Sheet, SheetContent, getContent, getFile, genId, saveFile } from "@/src/storage/db";
@@ -143,6 +144,7 @@ export default function SheetEditor() {
           testID="sheet-title"
           value={meta.title}
           onChangeText={(t) => { const m = { ...meta, title: t }; setMeta(m); if (content) scheduleSave(content); }}
+          returnKeyType="done"
           style={[styles.titleInput, { color: colors.onSurface }]}
         />
         <TouchableOpacity onPress={() => router.push(`/sheets/tools/${id}` as any)} testID="sheet-tools">
@@ -160,6 +162,7 @@ export default function SheetEditor() {
           onChangeText={setFormula}
           onBlur={commitFormula}
           onSubmitEditing={commitFormula}
+          returnKeyType="done"
           placeholder="Enter value or =formula"
           placeholderTextColor={colors.muted}
           style={[styles.formulaInput, { color: colors.onSurface, backgroundColor: colors.surface }]}
@@ -167,8 +170,9 @@ export default function SheetEditor() {
         <TouchableOpacity onPress={commitFormula} testID="formula-apply"><Icon name="check" size={22} color={colors.brandPrimary} /></TouchableOpacity>
       </View>
 
-      <ScrollView style={{ flex: 1 }}>
-        <ScrollView horizontal>
+      <KeyboardAvoid style={{ flex: 1 }}>
+      <ScrollView style={{ flex: 1 }} {...SCROLL_KEYBOARD_PROPS}>
+        <ScrollView horizontal keyboardShouldPersistTaps="handled">
           <View>
             {/* Column headers */}
             <View style={{ flexDirection: "row" }}>
@@ -230,7 +234,7 @@ export default function SheetEditor() {
         </ScrollView>
       </ScrollView>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.toolbar, { borderTopColor: colors.border, backgroundColor: colors.surfaceSecondary }]} contentContainerStyle={{ paddingHorizontal: 12, alignItems: "center", gap: 6 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={[styles.toolbar, { borderTopColor: colors.border, backgroundColor: colors.surfaceSecondary }]} contentContainerStyle={{ paddingHorizontal: 12, alignItems: "center", gap: 6 }}>
         <TB icon="format-bold" onPress={() => applyFormatToSel({ bold: !activeSheet.cells[cellId(selection.row, selection.col)]?.style?.bold })} />
         <TB icon="format-italic" onPress={() => applyFormatToSel({ italic: !activeSheet.cells[cellId(selection.row, selection.col)]?.style?.italic })} />
         <TB icon="format-align-left" onPress={() => applyFormatToSel({ align: "left" })} />
@@ -257,6 +261,7 @@ export default function SheetEditor() {
         </ScrollView>
         <AppText variant="caption" style={{ paddingHorizontal: 12 }}>{dirty ? "Saving…" : "Saved"}</AppText>
       </View>
+      </KeyboardAvoid>
 
       <BottomSheet visible={chartSheet} onClose={() => setChartSheet(false)} title="Insert chart">
         <AppText variant="muted" style={{ marginBottom: 12 }}>Selected: {cellId(selection.row, selection.col)}{dragEnd ? `:${cellId(dragEnd.row, dragEnd.col)}` : ""}</AppText>

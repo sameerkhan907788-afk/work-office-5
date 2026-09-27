@@ -6,6 +6,7 @@ import Icon from "@react-native-vector-icons/material-design-icons";
 import { AppText } from "@/src/components/app-text";
 import { BottomSheet } from "@/src/components/bottom-sheet";
 import { Button } from "@/src/components/button";
+import { KeyboardAvoid, SCROLL_KEYBOARD_PROPS } from "@/src/components/keyboard";
 import { useToast } from "@/src/components/toast";
 import { useTheme } from "@/src/theme";
 import { FileMeta, SlideContent, Slide, SlideElement, getContent, getFile, genId, saveFile } from "@/src/storage/db";
@@ -133,13 +134,15 @@ export default function SlideEditor() {
           testID="slide-title"
           value={meta.title}
           onChangeText={(t) => { const m = { ...meta, title: t }; setMeta(m); if (content) scheduleSave(content); }}
+          returnKeyType="done"
           style={[styles.titleInput, { color: colors.onSurface }]}
         />
         <TouchableOpacity onPress={() => setPresent(true)} testID="slide-present"><Icon name="play-circle-outline" size={24} color={colors.brandPrimary} /></TouchableOpacity>
         <TouchableOpacity onPress={() => router.push(`/slides/tools/${id}` as any)} testID="slide-tools"><Icon name="tune-variant" size={22} color={colors.brandPrimary} /></TouchableOpacity>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, alignItems: "center" }}>
+      <KeyboardAvoid style={{ flex: 1 }}>
+      <ScrollView style={{ flex: 1 }} {...SCROLL_KEYBOARD_PROPS} contentContainerStyle={{ padding: 16, alignItems: "center" }}>
         <TouchableOpacity activeOpacity={1} onPress={() => setSelectedEl(null)}>
           <SlideView slide={slide} theme={content.theme} width={Math.min(Dimensions.get("window").width - 32, 640)} height={Math.min(Dimensions.get("window").width - 32, 640) * (CANVAS_H / CANVAS_W)} selectedId={selectedEl} onSelectEl={setSelectedEl} onEditText={(id, text) => updateEl(slide.id, id, { text } as any)} />
         </TouchableOpacity>
@@ -168,7 +171,7 @@ export default function SlideEditor() {
         ) : null}
       </ScrollView>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.toolbar, { borderTopColor: colors.border, backgroundColor: colors.surfaceSecondary }]} contentContainerStyle={{ paddingHorizontal: 12, alignItems: "center", gap: 6 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={[styles.toolbar, { borderTopColor: colors.border, backgroundColor: colors.surfaceSecondary }]} contentContainerStyle={{ paddingHorizontal: 12, alignItems: "center", gap: 6 }}>
         <TB icon="plus" onPress={() => addSlide()} label="Add" />
         <TB icon="content-duplicate" onPress={duplicateSlide} label="Duplicate" />
         <TB icon="trash-can-outline" onPress={deleteSlide} label="Delete" />
@@ -189,6 +192,7 @@ export default function SlideEditor() {
       <View style={{ padding: 8, alignItems: "center" }}>
         <AppText variant="caption">{dirty ? "Saving…" : "Saved"} · Slide {current + 1} of {content.slides.length}</AppText>
       </View>
+      </KeyboardAvoid>
     </View>
   );
 }

@@ -11,6 +11,7 @@ import { deleteFile, FileMeta, listFiles, listWorkspaces, newDoc, newSheet, newS
 import { unreadNotificationCount } from "@/src/notifications/local";
 import { BottomSheet } from "@/src/components/bottom-sheet";
 import { Button } from "@/src/components/button";
+import { KeyboardAvoid, SCROLL_KEYBOARD_PROPS, dismissKeyboard } from "@/src/components/keyboard";
 import { useToast } from "@/src/components/toast";
 
 const MODULES = [
@@ -85,7 +86,9 @@ export default function Home() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface, paddingTop: insets.top }]}>
+      <KeyboardAvoid style={{ flex: 1 }}>
       <ScrollView
+        {...SCROLL_KEYBOARD_PROPS}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brandPrimary} />}
         showsVerticalScrollIndicator={false}
@@ -118,6 +121,7 @@ export default function Home() {
             style={[styles.searchInput, { color: colors.onSurface }]}
             value={query}
             onChangeText={setQuery}
+            returnKeyType="search"
           />
           <View style={[styles.offlineBadge, { backgroundColor: colors.brandTertiary }]}>
             <View style={[styles.dot, { backgroundColor: colors.success }]} />
@@ -153,7 +157,7 @@ export default function Home() {
         {recent.length > 0 ? (
           <>
             <AppText variant="h3" style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>Recent</AppText>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 16 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 12, paddingRight: 16 }}>
               {recent.map((f) => <RecentTile key={f.id} file={f} onOpen={() => openFile(f, router)} />)}
             </ScrollView>
           </>
@@ -164,7 +168,7 @@ export default function Home() {
           <AppText variant="muted">{filtered.length}</AppText>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.md }} contentContainerStyle={{ gap: 8, paddingRight: 16 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ marginTop: spacing.md }} contentContainerStyle={{ gap: 8, paddingRight: 16 }}>
           {(["all", "doc", "sheet", "slide", "favorite", "trash"] as const).map((t) => (
             <TouchableOpacity
               key={t}
@@ -196,6 +200,7 @@ export default function Home() {
           ) : null}
         </View>
       </ScrollView>
+      </KeyboardAvoid>
 
       <BottomSheet visible={!!longPressed} onClose={() => setLongPressed(null)} title={longPressed?.title}>
         {longPressed ? (
@@ -244,6 +249,9 @@ export default function Home() {
 }
 
 function openFile(f: FileMeta, router: any) {
+  // Dismiss the search keyboard before pushing the editor; Home stays mounted
+  // in the stack and the keyboard must not linger over the next screen.
+  dismissKeyboard();
   const path = f.type === "doc" ? "docs" : f.type === "sheet" ? "sheets" : "slides";
   router.push(`/${path}/${f.id}` as any);
 }
