@@ -6,10 +6,13 @@ import Icon from "@react-native-vector-icons/material-design-icons";
 import { AppText } from "@/src/components/app-text";
 import { BottomSheet } from "@/src/components/bottom-sheet";
 import { Button } from "@/src/components/button";
+import { EditorActions } from "@/src/components/editor-actions";
 import { KeyboardAvoid, SCROLL_KEYBOARD_PROPS } from "@/src/components/keyboard";
 import { useToast } from "@/src/components/toast";
 import { useTheme } from "@/src/theme";
 import { FileMeta, SlideContent, Slide, SlideElement, getContent, getFile, genId, saveFile } from "@/src/storage/db";
+import { exportContent, type ExportKind } from "@/src/export/formats";
+import { exportAndShare } from "@/src/export/share";
 import { SlideView } from "@/src/components/slide-view";
 
 const CANVAS_W = 720;
@@ -31,6 +34,8 @@ export default function SlideEditor() {
   const [savedAt, setSavedAt] = useState(0);
   const [dirty, setDirty] = useState(false);
   const saveTimer = useRef<any>(null);
+  const metaRef = useRef<FileMeta | null>(null);
+  const contentRef = useRef<SlideContent | null>(null);
 
   useFocusEffect(useCallback(() => {
     let mounted = true;
@@ -40,7 +45,9 @@ export default function SlideEditor() {
         const c = await getContent<SlideContent>(String(id));
         if (mounted) {
           setMeta(m);
+          metaRef.current = m;
           setContent(c);
+          contentRef.current = c;
         }
       } catch (error) {
         console.warn("[slides] load failed", error);
@@ -74,6 +81,52 @@ export default function SlideEditor() {
   useEffect(() => () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
   }, []);
+  useEffect(() => { metaRef.current = meta; }, [meta]);
+  useEffect(() => { contentRef.current = content; }, [content]);
+
+  const persistNow = useCallback(async (): Promise<boolean> => {
+    const currentMeta = metaRef.current || meta;
+    const currentContent = contentRef.current || content;
+    if (!currentMeta || !currentContent) {
+      toast.show("This presentation is not ready to save", "error");
+      return false;
+    }
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    try {
+      const ok = await saveFile({ ...currentMeta, updatedAt: Date.now() }, currentContent);
+      if (!ok) {
+        toast.show("Could not save the presentation. Your changes remain open.", "error");
+        return false;
+      }
+      setDirty(false);
+      setSavedAt(Date.now());
+      return true;
+    } catch (error) {
+      console.warn("[slides] explicit save failed", error);
+      toast.show("Could not save the presentation. Please try again.", "error");
+      return false;
+    }
+  }, [meta, content, toast]);
+
+  const saveNow = useCallback(async () => {
+    if (await persistNow()) toast.show("Presentation saved on this device", "success");
+  }, [persistNow, toast]);
+
+  const exportPresentation = useCallback(async (kind: ExportKind) => {
+    if (!(await persistNow())) return;
+    const currentMeta = metaRef.current || meta;
+    const currentContent = contentRef.current || content;
+    if (!currentMeta || !currentContent) return;
+    try {
+      const result = await exportAndShare(kind, currentMeta.title, exportContent(kind, currentMeta, currentContent));
+      if (result.mode === "shared") toast.show("Share sheet opened", "success");
+      else if (result.mode === "downloaded") toast.show("File downloaded by the browser", "success");
+      else toast.show("No compatible sharing option is available on this device", "error");
+    } catch (error) {
+      console.warn("[slides] export/share failed", error);
+      toast.show("Could not export or share the presentation", "error");
+    }
+  }, [persistNow, meta, content, toast]);
   const updateContent = useCallback((updater: (c: SlideContent) => SlideContent) => {
     setContent((prev) => { if (!prev) return prev; const n = updater(prev); scheduleSave(n); return n; });
   }, [scheduleSave]);
@@ -164,6 +217,14 @@ export default function SlideEditor() {
         <TouchableOpacity onPress={() => setPresent(true)} testID="slide-present"><Icon name="play-circle-outline" size={24} color={colors.brandPrimary} /></TouchableOpacity>
         <TouchableOpacity onPress={() => router.push(`/slides/tools/${id}` as any)} testID="slide-tools"><Icon name="tune-variant" size={22} color={colors.brandPrimary} /></TouchableOpacity>
       </View>
+
+      <EditorActions
+        onSave={saveNow}
+        exports={[
+          { id: "json", title: "Share JSON", subtitle: "Full presentation data", onPress: () => exportPresentation("json") },
+          { id: "html", title: "Share HTML", subtitle: "Viewable slide deck", onPress: () => exportPresentation("html") },
+        ]}
+      />
 
       <KeyboardAvoid style={{ flex: 1 }}>
       <ScrollView style={{ flex: 1 }} {...SCROLL_KEYBOARD_PROPS} contentContainerStyle={{ padding: 16, alignItems: "center" }}>

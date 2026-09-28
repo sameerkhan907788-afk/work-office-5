@@ -6,10 +6,13 @@ import Icon from "@react-native-vector-icons/material-design-icons";
 import { AppText } from "@/src/components/app-text";
 import { BottomSheet } from "@/src/components/bottom-sheet";
 import { Button } from "@/src/components/button";
+import { EditorActions } from "@/src/components/editor-actions";
 import { KeyboardAvoid, SCROLL_KEYBOARD_PROPS, dismissKeyboard } from "@/src/components/keyboard";
 import { useToast } from "@/src/components/toast";
 import { useTheme, spacing, radius } from "@/src/theme";
 import { DocBlock, DocContent, FileMeta, getContent, getFile, genId, saveFile } from "@/src/storage/db";
+import { exportContent, type ExportKind } from "@/src/export/formats";
+import { exportAndShare } from "@/src/export/share";
 
 type Selection = { blockId: string; range?: "all" };
 
@@ -31,6 +34,8 @@ export default function DocEditor() {
   const historyRef = useRef<DocContent[]>([]);
   const futureRef = useRef<DocContent[]>([]);
   const saveTimer = useRef<any>(null);
+  const metaRef = useRef<FileMeta | null>(null);
+  const contentRef = useRef<DocContent | null>(null);
 
   useFocusEffect(useCallback(() => {
     let mounted = true;
@@ -40,7 +45,10 @@ export default function DocEditor() {
         const c = await getContent<DocContent>(String(id));
         if (mounted) {
           setMeta(m);
-          setContent(c || { blocks: [{ id: genId(), kind: "p", text: "" }] });
+          metaRef.current = m;
+          const nextContent = c || { blocks: [{ id: genId(), kind: "p" as const, text: "" }] };
+          setContent(nextContent);
+          contentRef.current = nextContent;
         }
       } catch (error) {
         console.warn("[doc] load failed", error);
@@ -115,6 +123,52 @@ export default function DocEditor() {
     if (content) scheduleSave(content, next);
   }, [meta, content, scheduleSave]);
 
+  useEffect(() => { metaRef.current = meta; }, [meta]);
+  useEffect(() => { contentRef.current = content; }, [content]);
+
+  const persistNow = useCallback(async (): Promise<boolean> => {
+    const currentMeta = metaRef.current || meta;
+    const currentContent = contentRef.current || content;
+    if (!currentMeta || !currentContent) {
+      toast.show("This document is not ready to save", "error");
+      return false;
+    }
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    try {
+      const ok = await saveFile({ ...currentMeta, updatedAt: Date.now() }, currentContent);
+      if (!ok) {
+        toast.show("Could not save the document. Your changes remain open.", "error");
+        return false;
+      }
+      setDirty(false);
+      setSavedAt(Date.now());
+      return true;
+    } catch (error) {
+      console.warn("[doc] explicit save failed", error);
+      toast.show("Could not save the document. Please try again.", "error");
+      return false;
+    }
+  }, [meta, content, toast]);
+
+  const saveNow = useCallback(async () => {
+    if (await persistNow()) toast.show("Document saved on this device", "success");
+  }, [persistNow, toast]);
+
+  const exportDocument = useCallback(async (kind: ExportKind) => {
+    if (!(await persistNow())) return;
+    const currentMeta = metaRef.current || meta;
+    const currentContent = contentRef.current || content;
+    if (!currentMeta || !currentContent) return;
+    try {
+      const result = await exportAndShare(kind, currentMeta.title, exportContent(kind, currentMeta, currentContent));
+      if (result.mode === "shared") toast.show("Share sheet opened", "success");
+      else if (result.mode === "downloaded") toast.show("File downloaded by the browser", "success");
+      else toast.show("No compatible sharing option is available on this device", "error");
+    } catch (error) {
+      console.warn("[doc] export/share failed", error);
+      toast.show("Could not export or share the document", "error");
+    }
+  }, [persistNow, meta, content, toast]);
   const updateBlock = useCallback((bid: string, patch: Partial<DocBlock>) => {
     commit((c) => ({ ...c, blocks: c.blocks.map((b) => (b.id === bid ? { ...b, ...patch, style: { ...b.style, ...patch.style } } : b)) }));
   }, [commit]);
@@ -181,6 +235,14 @@ export default function DocEditor() {
           </TouchableOpacity>
         </View>
       </View>
+
+      <EditorActions
+        onSave={saveNow}
+        exports={[
+          { id: "txt", title: "Share TXT", subtitle: "Plain text document", onPress: () => exportDocument("txt") },
+          { id: "html", title: "Share HTML", subtitle: "Formatted web document", onPress: () => exportDocument("html") },
+        ]}
+      />
 
       <View style={[styles.statusRow, { borderBottomColor: colors.border }]}>
         <AppText variant="caption">{status} · {content.blocks.reduce((s, b) => s + b.text.trim().split(/\s+/).filter(Boolean).length, 0)} words</AppText>

@@ -6,10 +6,13 @@ import Icon from "@react-native-vector-icons/material-design-icons";
 import { AppText } from "@/src/components/app-text";
 import { BottomSheet } from "@/src/components/bottom-sheet";
 import { Button } from "@/src/components/button";
+import { EditorActions } from "@/src/components/editor-actions";
 import { KeyboardAvoid, SCROLL_KEYBOARD_PROPS } from "@/src/components/keyboard";
 import { useToast } from "@/src/components/toast";
 import { useTheme, radius } from "@/src/theme";
 import { Cell, FileMeta, Sheet, SheetContent, getContent, getFile, genId, saveFile } from "@/src/storage/db";
+import { exportContent, type ExportKind } from "@/src/export/formats";
+import { exportAndShare } from "@/src/export/share";
 import { cellId, colToLetter, computeCell } from "@/src/sheets/formula";
 import { ChartView } from "@/src/components/chart-view";
 
@@ -35,6 +38,8 @@ export default function SheetEditor() {
   const [sheetMenu, setSheetMenu] = useState(false);
   const [chartSheet, setChartSheet] = useState(false);
   const saveTimer = useRef<any>(null);
+  const metaRef = useRef<FileMeta | null>(null);
+  const contentRef = useRef<SheetContent | null>(null);
 
   const activeSheet = useMemo(() => content?.sheets.find((s) => s.id === activeSheetId), [content, activeSheetId]);
 
@@ -51,7 +56,9 @@ export default function SheetEditor() {
         const c = await getContent<SheetContent>(String(id));
         if (mounted) {
           setMeta(m);
+          metaRef.current = m;
           setContent(c);
+          contentRef.current = c;
           if (c?.sheets[0]) setActiveSheetId(c.sheets[0].id);
         }
       } catch (error) {
@@ -89,6 +96,70 @@ export default function SheetEditor() {
     }, 500);
   }, [meta, toast]);
 
+  useEffect(() => { metaRef.current = meta; }, [meta]);
+  useEffect(() => { contentRef.current = content; }, [content]);
+
+  const buildContentForSave = useCallback((): SheetContent | null => {
+    const currentContent = contentRef.current || content;
+    if (!currentContent) return null;
+    const currentSheet = currentContent.sheets.find((sheet) => sheet.id === activeSheetId);
+    if (!currentSheet || !selection) return currentContent;
+    const key = cellId(selection.row, selection.col);
+    const cells = { ...currentSheet.cells };
+    if (formula === "") delete cells[key];
+    else if (formula.startsWith("=")) cells[key] = { ...cells[key], f: formula, v: undefined };
+    else {
+      const number = parseFloat(formula);
+      cells[key] = { ...cells[key], v: isNaN(number) ? formula : number, f: undefined };
+    }
+    return { ...currentContent, sheets: currentContent.sheets.map((sheet) => sheet.id === currentSheet.id ? { ...sheet, cells } : sheet) };
+  }, [content, activeSheetId, selection, formula]);
+
+  const persistNow = useCallback(async (): Promise<boolean> => {
+    const currentMeta = metaRef.current || meta;
+    const nextContent = buildContentForSave();
+    if (!currentMeta || !nextContent) {
+      toast.show("This spreadsheet is not ready to save", "error");
+      return false;
+    }
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    try {
+      const ok = await saveFile({ ...currentMeta, updatedAt: Date.now() }, nextContent);
+      if (!ok) {
+        toast.show("Could not save the spreadsheet. Your changes remain open.", "error");
+        return false;
+      }
+      setContent(nextContent);
+      contentRef.current = nextContent;
+      setDirty(false);
+      setSavedAt(Date.now());
+      return true;
+    } catch (error) {
+      console.warn("[sheet] explicit save failed", error);
+      toast.show("Could not save the spreadsheet. Please try again.", "error");
+      return false;
+    }
+  }, [meta, buildContentForSave, toast]);
+
+  const saveNow = useCallback(async () => {
+    if (await persistNow()) toast.show("Spreadsheet saved on this device", "success");
+  }, [persistNow, toast]);
+
+  const exportSpreadsheet = useCallback(async (kind: ExportKind) => {
+    if (!(await persistNow())) return;
+    const currentMeta = metaRef.current || meta;
+    const currentContent = contentRef.current || content;
+    if (!currentMeta || !currentContent) return;
+    try {
+      const result = await exportAndShare(kind, currentMeta.title, exportContent(kind, currentMeta, currentContent));
+      if (result.mode === "shared") toast.show("Share sheet opened", "success");
+      else if (result.mode === "downloaded") toast.show("File downloaded by the browser", "success");
+      else toast.show("No compatible sharing option is available on this device", "error");
+    } catch (error) {
+      console.warn("[sheet] export/share failed", error);
+      toast.show("Could not export or share the spreadsheet", "error");
+    }
+  }, [persistNow, meta, content, toast]);
   const updateSheet = useCallback((sid: string, updater: (s: Sheet) => Sheet) => {
     setContent((prev) => {
       if (!prev) return prev;
@@ -177,6 +248,14 @@ export default function SheetEditor() {
           <Icon name="tune-variant" size={22} color={colors.brandPrimary} />
         </TouchableOpacity>
       </View>
+
+      <EditorActions
+        onSave={saveNow}
+        exports={[
+          { id: "csv", title: "Share CSV", subtitle: "Spreadsheet values", onPress: () => exportSpreadsheet("csv") },
+          { id: "json", title: "Share JSON", subtitle: "Full workbook data", onPress: () => exportSpreadsheet("json") },
+        ]}
+      />
 
       <View style={[styles.formulaBar, { borderBottomColor: colors.border }]}>
         <View style={[styles.cellRef, { backgroundColor: colors.surfaceTertiary }]}>
