@@ -144,6 +144,23 @@ frontend:
       - working: true
         agent: "testing"
         comment: "✅ COMPREHENSIVE END-TO-END TEST PASSED. Tested on mobile (390x844) and wide (1280x800) viewports. All requirements verified: (1) Home launches instantly in 0.12s without blocking splash; (2) Custom Jarvis branding visible, zero Emergent/Google branding found; (3) Home search and all filters (all/doc/sheet/slide/favorite/trash) work correctly; (4) Create/open/edit/autosave/back flows for Docs, Sheets, and Slides all functional with autosave working; (5) Settings opens and all rows work: Templates, Workspaces, Notifications, Global Search, Privacy Policy, Terms & Conditions, Support link (mailto); (6) Local notifications page renders with local-only banner, no backend/push requests; (7) Workspace creation works; (8) Template preview/apply works; (9) Keyboard input and safe-area behavior work correctly; (10) Navigation is instant (0.05-0.08s) with no artificial delays. Only 3 console warnings (React Native web compatibility warnings, not errors). Zero runtime errors. All screenshots captured successfully."
+  - task: "Spreadsheet launch robustness and performance fix (no unavailable messages, instant open, windowed grid)"
+    implemented: true
+    working: true
+    file: "frontend/app/index.tsx, frontend/app/sheets/[id].tsx, frontend/src/components/sheet-grid.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "user"
+        comment: "User reports tapping Spreadsheet shows unavailable and takes too long to open; requests a complete fast, smooth, responsive offline fix with no loading screens, spinners, or artificial delays and no regressions."
+      - working: "NA"
+        agent: "main"
+        comment: "Fixed spreadsheet launch robustness and performance: Home now verifies local save success before navigating; sheet loading validates and repairs missing/malformed offline content without a blocking loading screen; the 100x26 grid is now windowed/virtualized to render only visible rows and columns while retaining scrolling, selection, formulas, formatting, and charts. No network or artificial delay added."
+      - working: true
+        agent: "testing"
+        comment: "✅ SPREADSHEET BUG FIX VERIFICATION COMPLETE - ALL TESTS PASSED. Comprehensive testing on mobile (390x844) and wide (1280x800) viewports confirms: (1) Spreadsheet opens INSTANTLY (0.00s, no delay) from Home Spreadsheet card; (2) ZERO 'Spreadsheet unavailable', 'Unavailable', 'Loading…', 'Indexing…', spinners, or artificial delays detected; (3) Grid renders immediately with cells visible (A1, B1, etc. all present); (4) Cell interaction works perfectly - tapped cells, entered values (100), entered formulas (=A1*2), pressed formula apply, values remain visible; (5) Formatting toolbar fully functional - bold, italic, currency, number, percent, date, alignment all work; (6) Chart insertion works - opened chart sheet, selected column chart, chart inserted successfully; (7) Sheet tabs work - added new sheet (Sheet2), tab switching works; (8) Save button works - clicked Save, success toast appeared; (9) Share/export works - opened Share modal, CSV and JSON export options visible; (10) Scrolling is smooth - vertical and horizontal scrolling tested, no blank gaps, no crashes; (11) Navigation persistence verified - navigated Home → Spreadsheet → back → Spreadsheet, content persisted correctly; (12) Document and Presentation regression check PASSED - both open instantly (0.00s) and load correctly, no regressions; (13) Wide viewport (1280x800) works identically to mobile - instant open, no unavailable messages, grid renders, cell interaction works; (14) Console logs show ZERO runtime errors, only 4 expected React Native web compatibility warnings (shadow props, pointerEvents, useNativeDriver, DevTools); (15) Network analysis confirms ZERO backend/API requests - app is fully offline as designed. All 15 verification points from review request PASSED. Spreadsheet bug is FIXED."
   - task: "Offline state-synchronization fix for Document/Spreadsheet/Presentation tools and templates Apply actions"
     implemented: true
     working: true
@@ -175,17 +192,14 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 2
+  test_sequence: 3
   run_ui: true
 
 test_plan:
   current_focus:
-    - "Home opens directly and remains responsive"
-    - "Create/open/edit/save Docs, Sheets, and Slides flows"
-    - "Settings, legal pages, support link, workspaces, templates, search, trash, and local notifications"
-    - "No Emergent or Google branding remains in user-facing app"
+    - "Spreadsheet launch robustness and performance (COMPLETED)"
   stuck_tasks: []
-  test_all: true
+  test_all: false
   test_priority: "high_first"
 
 agent_communication:
@@ -225,3 +239,11 @@ agent_communication:
     message: "✅ SAVE/SHARE HEALTH CHECK COMPLETE - NO BACKEND DEPENDENCIES INTRODUCED. Quick health check verified: (1) Backend service RUNNING (pid 103, expected KeyError for MONGO_URL - intentional for offline app); (2) Frontend service RUNNING and accessible at localhost:3000 (HTTP 200); (3) Frontend logs show only expected React Native web warnings, zero runtime errors; (4) Save/Share implementation verified fully offline: formats.ts performs pure local data transformation (TXT/HTML/CSV/JSON exports), share.ts uses only expo-file-system for local file creation and expo-sharing for native share sheet (mobile) or browser download API (web); (5) No fetch/axios/API calls found in editor files (docs/[id].tsx, sheets/[id].tsx, slides/[id].tsx); (6) No HTTP client dependencies in package.json; (7) All Save/Share operations use local AsyncStorage (saveFile) and local file system APIs. Conclusion: The Save/Share enhancement introduces ZERO backend integration or API dependency. App remains fully offline as designed."
   - agent: "testing"
     message: "✅ COMPREHENSIVE SAVE/SHARE TESTING COMPLETE - ALL REQUIREMENTS VERIFIED. Tested on mobile (390x844) and wide (1280x800) viewports. Created and tested one Document, one Spreadsheet, and one Presentation. All verification points passed: (1) Save and Share controls are visible and properly labeled in all three editors; (2) Edited content immediately before Save in all editors - success toasts appeared ('Document/Spreadsheet/Presentation saved on this device'); (3) Navigated away and back - data persisted correctly (titles and content verified); (4) Share modal shows exact correct options: Document (TXT + HTML), Spreadsheet (CSV + JSON), Presentation (JSON + HTML); (5) Triggered all six export formats - browser download fallback works with success message ('File downloaded by the browser'); (6) Zero network/API requests during any export (fully offline); (7) Native-sharing code properly guarded: Platform.OS check for web, Sharing.isAvailableAsync() check, returns 'unsupported' mode if unavailable, try-catch in all editors; (8) Title edits work in all editors; (9) Zero runtime errors, only expected React Native web compatibility warnings; (10) Responsive layout verified - buttons on same row in wide viewport; (11) No loading spinners visible anywhere; (12) No expo-notifications package or imports found. All Save/Share functionality working correctly as specified."
+  - agent: "user"
+    message: "User reports tapping Spreadsheet shows unavailable and takes too long to open; requests a complete fast, smooth, responsive offline fix with no loading screens, spinners, or artificial delays and no regressions."
+  - agent: "main"
+    message: "Fixed spreadsheet launch robustness and performance: Home now verifies local save success before navigating; sheet loading validates and repairs missing/malformed offline content without a blocking loading screen; the 100x26 grid is now windowed/virtualized to render only visible rows and columns while retaining scrolling, selection, formulas, formatting, and charts. No network or artificial delay added."
+  - agent: "main"
+    message: "Please verify Spreadsheet opens from Home on mobile and wide viewports, renders immediately without Unavailable/Loading/spinners, supports cell selection/formula entry/formatting/charts/sheet tabs, scrolls smoothly, persists offline, and does not regress Document/Presentation startup."
+  - agent: "testing"
+    message: "✅ SPREADSHEET BUG FIX VERIFICATION COMPLETE - ALL TESTS PASSED. Comprehensive testing on mobile (390x844) and wide (1280x800) viewports confirms: (1) Spreadsheet opens INSTANTLY (0.00s, no delay) from Home Spreadsheet card; (2) ZERO 'Spreadsheet unavailable', 'Unavailable', 'Loading…', 'Indexing…', spinners, or artificial delays detected; (3) Grid renders immediately with cells visible (A1, B1, etc. all present); (4) Cell interaction works perfectly - tapped cells, entered values (100), entered formulas (=A1*2), pressed formula apply, values remain visible; (5) Formatting toolbar fully functional - bold, italic, currency, number, percent, date, alignment all work; (6) Chart insertion works - opened chart sheet, selected column chart, chart inserted successfully; (7) Sheet tabs work - added new sheet (Sheet2), tab switching works; (8) Save button works - clicked Save, success toast appeared; (9) Share/export works - opened Share modal, CSV and JSON export options visible; (10) Scrolling is smooth - vertical and horizontal scrolling tested, no blank gaps, no crashes; (11) Navigation persistence verified - navigated Home → Spreadsheet → back → Spreadsheet, content persisted correctly; (12) Document and Presentation regression check PASSED - both open instantly (0.00s) and load correctly, no regressions; (13) Wide viewport (1280x800) works identically to mobile - instant open, no unavailable messages, grid renders, cell interaction works; (14) Console logs show ZERO runtime errors, only 4 expected React Native web compatibility warnings (shadow props, pointerEvents, useNativeDriver, DevTools); (15) Network analysis confirms ZERO backend/API requests - app is fully offline as designed. All 15 verification points from review request PASSED. Spreadsheet bug is FIXED."

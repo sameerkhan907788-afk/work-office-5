@@ -74,7 +74,11 @@ export default function Home() {
   const createFile = useCallback(async (type: "doc" | "sheet" | "slide") => {
     try {
       const created = type === "doc" ? newDoc() : type === "sheet" ? newSheet() : newSlide();
-      await saveFile(created.meta, created.content);
+      const saved = await saveFile(created.meta, created.content);
+      if (!saved) {
+        toast.show("Could not save the new file locally. Try again.", "error");
+        return;
+      }
       toast.show("Created", "success");
       router.push(`/${type === "doc" ? "docs" : type === "sheet" ? "sheets" : "slides"}/${created.meta.id}` as any);
     } catch {

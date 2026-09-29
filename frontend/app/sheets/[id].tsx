@@ -1,24 +1,21 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, StyleSheet, TouchableOpacity, TextInput, ScrollView, Dimensions } from "react-native";
+import { View, StyleSheet, TouchableOpacity, TextInput, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "@react-native-vector-icons/material-design-icons";
 import { AppText } from "@/src/components/app-text";
 import { BottomSheet } from "@/src/components/bottom-sheet";
 import { Button } from "@/src/components/button";
 import { EditorActions } from "@/src/components/editor-actions";
-import { KeyboardAvoid, SCROLL_KEYBOARD_PROPS } from "@/src/components/keyboard";
+import { SheetGrid } from "@/src/components/sheet-grid";
+import { KeyboardAvoid } from "@/src/components/keyboard";
 import { useToast } from "@/src/components/toast";
 import { useTheme, radius } from "@/src/theme";
-import { Cell, FileMeta, Sheet, SheetContent, getContent, getFile, genId, saveFile } from "@/src/storage/db";
+import { Cell, FileMeta, Sheet, SheetContent, getContent, getFile, genId, saveFile, newSheet } from "@/src/storage/db";
 import { exportContent, type ExportKind } from "@/src/export/formats";
 import { exportAndShare } from "@/src/export/share";
 import { cellId, colToLetter, computeCell } from "@/src/sheets/formula";
-import { ChartView } from "@/src/components/chart-view";
 
-const CELL_W = 90;
-const CELL_H = 34;
-const ROW_HEADER_W = 44;
 
 export default function SheetEditor() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -54,12 +51,19 @@ export default function SheetEditor() {
       try {
         const m = await getFile(String(id));
         const c = await getContent<SheetContent>(String(id));
+        const validContent = c && Array.isArray(c.sheets) && c.sheets.length > 0 && c.sheets.every((sheet) => sheet && typeof sheet.id === "string" && sheet.cells && typeof sheet.cells === "object");
+        const nextContent = validContent ? c : m ? newSheet(m.title || "Untitled Spreadsheet", m.workspaceId).content : null;
         if (mounted) {
           setMeta(m);
           metaRef.current = m;
-          setContent(c);
-          contentRef.current = c;
-          if (c?.sheets[0]) setActiveSheetId(c.sheets[0].id);
+          setContent(nextContent);
+          contentRef.current = nextContent;
+          if (nextContent?.sheets[0]) setActiveSheetId(nextContent.sheets[0].id);
+          if (m && !validContent && nextContent) {
+            void saveFile(m, nextContent).then((ok) => {
+              if (!ok && mounted) toast.show("Could not repair this spreadsheet locally", "error");
+            });
+          }
         }
       } catch (error) {
         console.warn("[sheet] load failed", error);
@@ -276,68 +280,7 @@ export default function SheetEditor() {
       </View>
 
       <KeyboardAvoid style={{ flex: 1 }}>
-      <ScrollView style={{ flex: 1 }} {...SCROLL_KEYBOARD_PROPS}>
-        <ScrollView horizontal keyboardShouldPersistTaps="handled">
-          <View>
-            {/* Column headers */}
-            <View style={{ flexDirection: "row" }}>
-              <View style={[styles.rowHeader, { width: ROW_HEADER_W, backgroundColor: colors.surfaceTertiary, borderColor: colors.border }]} />
-              {Array.from({ length: activeSheet.cols }).map((_, ci) => (
-                <View key={ci} style={[styles.colHeader, { width: CELL_W, height: CELL_H, backgroundColor: colors.surfaceTertiary, borderColor: colors.border }]}>
-                  <AppText variant="caption">{colToLetter(ci)}</AppText>
-                </View>
-              ))}
-            </View>
-            {/* Rows */}
-            {Array.from({ length: activeSheet.rows }).map((_, ri) => (
-              <View key={ri} style={{ flexDirection: "row" }}>
-                <View style={[styles.rowHeader, { width: ROW_HEADER_W, height: CELL_H, backgroundColor: colors.surfaceTertiary, borderColor: colors.border }]}>
-                  <AppText variant="caption">{ri + 1}</AppText>
-                </View>
-                {Array.from({ length: activeSheet.cols }).map((_, ci) => {
-                  const sel = selection.row === ri && selection.col === ci;
-                  const c = activeSheet.cells[cellId(ri, ci)];
-                  const style = c?.style || {};
-                  return (
-                    <TouchableOpacity
-                      key={ci}
-                      testID={`cell-${cellId(ri, ci)}`}
-                      onPress={() => setSelection({ row: ri, col: ci })}
-                      style={[styles.cell, {
-                        width: CELL_W, height: CELL_H,
-                        backgroundColor: style.bg || (sel ? colors.brandTertiary : colors.surfaceSecondary),
-                        borderColor: sel ? colors.brandPrimary : colors.border,
-                        borderWidth: sel ? 2 : 0.5,
-                        justifyContent: "center",
-                      }]}
-                    >
-                      <AppText
-                        numberOfLines={1}
-                        style={{
-                          color: style.color || colors.onSurface,
-                          fontWeight: style.bold ? "700" : "400",
-                          fontStyle: style.italic ? "italic" : "normal",
-                          textAlign: style.align || (typeof c?.v === "number" ? "right" : "left"),
-                          fontSize: 13,
-                          paddingHorizontal: 6,
-                        }}
-                      >
-                        {displayValue(ri, ci)}
-                      </AppText>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            ))}
-            {/* Charts */}
-            {(activeSheet.charts || []).map((ch) => (
-              <View key={ch.id} style={{ padding: 12 }}>
-                <ChartView chart={ch} sheet={activeSheet} />
-              </View>
-            ))}
-          </View>
-        </ScrollView>
-      </ScrollView>
+      <SheetGrid sheet={activeSheet} selection={selection} onSelect={setSelection} displayValue={displayValue} />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={[styles.toolbar, { borderTopColor: colors.border, backgroundColor: colors.surfaceSecondary }]} contentContainerStyle={{ paddingHorizontal: 12, alignItems: "center", gap: 6 }}>
         <TB icon="format-bold" onPress={() => applyFormatToSel({ bold: !activeSheet.cells[cellId(selection.row, selection.col)]?.style?.bold })} />
